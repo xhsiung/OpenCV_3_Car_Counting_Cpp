@@ -5,7 +5,10 @@
 #include<opencv2/imgproc/imgproc.hpp>
 
 #include<iostream>
-#include<conio.h>           // it may be necessary to change or remove this line if not using Windows
+#include <stdio.h>
+//#include<conio.h>		// it may be necessary to change or remove this line if not using Windows
+#include <fstream>		// file utils
+#include <ctime>		// timestamp stuff
 
 #include "Blob.h"
 
@@ -17,6 +20,7 @@ const cv::Scalar SCALAR_WHITE = cv::Scalar(255.0, 255.0, 255.0);
 const cv::Scalar SCALAR_YELLOW = cv::Scalar(0.0, 255.0, 255.0);
 const cv::Scalar SCALAR_GREEN = cv::Scalar(0.0, 200.0, 0.0);
 const cv::Scalar SCALAR_RED = cv::Scalar(0.0, 0.0, 255.0);
+const cv::Scalar SCALAR_BLUE = cv::Scalar(255.0, 0.0, 0.0);
 
 // function prototypes ////////////////////////////////////////////////////////////////////////////
 void matchCurrentFrameBlobsToExistingBlobs(std::vector<Blob> &existingBlobs, std::vector<Blob> &currentFrameBlobs);
@@ -25,48 +29,65 @@ void addNewBlob(Blob &currentFrameBlob, std::vector<Blob> &existingBlobs);
 double distanceBetweenPoints(cv::Point point1, cv::Point point2);
 void drawAndShowContours(cv::Size imageSize, std::vector<std::vector<cv::Point> > contours, std::string strImageName);
 void drawAndShowContours(cv::Size imageSize, std::vector<Blob> blobs, std::string strImageName);
-bool checkIfBlobsCrossedTheLine(std::vector<Blob> &blobs, int &intHorizontalLinePosition, int &carCount);
+bool checkIfBlobsCrossedTheLine(std::vector<Blob> &blobs, int &intVerticalLinePosition, int &carCountL, int &carCountR, std::ofstream &myfile);
 void drawBlobInfoOnImage(std::vector<Blob> &blobs, cv::Mat &imgFrame2Copy);
-void drawCarCountOnImage(int &carCount, cv::Mat &imgFrame2Copy);
+void drawCarCountOnImage(int &carCountL, int &carCountR, cv::Mat &imgFrame2Copy);
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 int main(void) {
 
     cv::VideoCapture capVideo;
+    std::ofstream myfile; // log file
 
     cv::Mat imgFrame1;
     cv::Mat imgFrame2;
+    cv::Mat imgFrame1L;
+    cv::Mat imgFrame2L;
 
     std::vector<Blob> blobs;
 
     cv::Point crossingLine[2];
 
-    int carCount = 0;
+    int carCountL = 0;
+    int carCountR = 0;
 
-    capVideo.open("CarsDrivingUnderBridge.mp4");
+    //capVideo.open("CarsDrivingUnderBridge.mp4");
+    capVideo.open("gP5PupjD2po.mp4");
+    
+    // log file
+    myfile.open ("/tmp/OpenCV-" + std::to_string(time(0)) + ".txt");
+    std::cout << "Logging to: \"/tmp/OpenCV-" << std::to_string(time(0)) << ".txt\"" << std::endl;
+    
+    myfile << "\"Timestamp\",\"Left\",\"Right\"" << std::endl;
 
     if (!capVideo.isOpened()) {                                                 // if unable to open video file
         std::cout << "error reading video file" << std::endl << std::endl;      // show error message
-        _getch();                   // it may be necessary to change or remove this line if not using Windows
+        //_getch();                   // it may be necessary to change or remove this line if not using Windows
         return(0);                                                              // and exit program
     }
 
     if (capVideo.get(CV_CAP_PROP_FRAME_COUNT) < 2) {
         std::cout << "error: video file must have at least two frames";
-        _getch();                   // it may be necessary to change or remove this line if not using Windows
+        //_getch();                   // it may be necessary to change or remove this line if not using Windows
         return(0);
     }
 
-    capVideo.read(imgFrame1);
-    capVideo.read(imgFrame2);
+    capVideo.read(imgFrame1L);
+    capVideo.read(imgFrame2L);
+    
+	resize(imgFrame1L, imgFrame1, cv::Size(imgFrame1L.size().width/2, imgFrame1L.size().height/2) );
+	resize(imgFrame2L, imgFrame2, cv::Size(imgFrame2L.size().width/2, imgFrame2L.size().height/2) );
 
-    int intHorizontalLinePosition = (int)std::round((double)imgFrame1.rows * 0.35);
 
-    crossingLine[0].x = 0;
-    crossingLine[0].y = intHorizontalLinePosition;
+    //int intHorizontalLinePosition = (int)std::round((double)imgFrame1.rows * 0.35);
+    int intVerticalLinePosition = (int)std::round((double)imgFrame1.cols * 0.50);
 
-    crossingLine[1].x = imgFrame1.cols - 1;
-    crossingLine[1].y = intHorizontalLinePosition;
+    crossingLine[0].y = 0;
+    crossingLine[0].x = intVerticalLinePosition;
+
+    crossingLine[1].y = imgFrame1.rows - 1;
+    crossingLine[1].x = intVerticalLinePosition;
+
 
     char chCheckForEscKey = 0;
 
@@ -94,7 +115,7 @@ int main(void) {
 
         cv::threshold(imgDifference, imgThresh, 30, 255.0, CV_THRESH_BINARY);
 
-        cv::imshow("imgThresh", imgThresh);
+        //cv::imshow("imgThresh", imgThresh);
 
         cv::Mat structuringElement3x3 = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(3, 3));
         cv::Mat structuringElement5x5 = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(5, 5));
@@ -153,16 +174,18 @@ int main(void) {
 
         drawBlobInfoOnImage(blobs, imgFrame2Copy);
 
-        bool blnAtLeastOneBlobCrossedTheLine = checkIfBlobsCrossedTheLine(blobs, intHorizontalLinePosition, carCount);
+        int blnAtLeastOneBlobCrossedTheLine = checkIfBlobsCrossedTheLine(blobs, intVerticalLinePosition, carCountL, carCountR, myfile);
 
-        if (blnAtLeastOneBlobCrossedTheLine == true) {
+        if (blnAtLeastOneBlobCrossedTheLine == 1) {
             cv::line(imgFrame2Copy, crossingLine[0], crossingLine[1], SCALAR_GREEN, 2);
-        }
+        } else if (blnAtLeastOneBlobCrossedTheLine == 2) {
+			cv::line(imgFrame2Copy, crossingLine[0], crossingLine[1], SCALAR_YELLOW, 2);
+		}
         else {
-            cv::line(imgFrame2Copy, crossingLine[0], crossingLine[1], SCALAR_RED, 2);
+            cv::line(imgFrame2Copy, crossingLine[0], crossingLine[1], SCALAR_BLUE, 2);
         }
 
-        drawCarCountOnImage(carCount, imgFrame2Copy);
+        drawCarCountOnImage(carCountL, carCountR, imgFrame2Copy);
 
         cv::imshow("imgFrame2Copy", imgFrame2Copy);
 
@@ -175,11 +198,14 @@ int main(void) {
         imgFrame1 = imgFrame2.clone();           // move frame 1 up to where frame 2 is
 
         if ((capVideo.get(CV_CAP_PROP_POS_FRAMES) + 1) < capVideo.get(CV_CAP_PROP_FRAME_COUNT)) {
-            capVideo.read(imgFrame2);
+            capVideo.read(imgFrame2L);
+            resize(imgFrame2L, imgFrame2, cv::Size(imgFrame2L.size().width/2, imgFrame2L.size().height/2) );
         }
         else {
-            std::cout << "end of video\n";
-            break;
+            time_t now = time(0);
+			char* dt = strtok(ctime(&now), "\n");;
+            std::cout << dt << ",EOF" << std::endl;
+            return(0); // end?
         }
 
         blnFirstFrame = false;
@@ -284,7 +310,7 @@ void drawAndShowContours(cv::Size imageSize, std::vector<std::vector<cv::Point> 
 
     cv::drawContours(image, contours, -1, SCALAR_WHITE, -1);
 
-    cv::imshow(strImageName, image);
+    //cv::imshow(strImageName, image);
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -302,22 +328,37 @@ void drawAndShowContours(cv::Size imageSize, std::vector<Blob> blobs, std::strin
 
     cv::drawContours(image, contours, -1, SCALAR_WHITE, -1);
 
-    cv::imshow(strImageName, image);
+    //cv::imshow(strImageName, image);
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
-bool checkIfBlobsCrossedTheLine(std::vector<Blob> &blobs, int &intHorizontalLinePosition, int &carCount) {
-    bool blnAtLeastOneBlobCrossedTheLine = false;
+bool checkIfBlobsCrossedTheLine(std::vector<Blob> &blobs, int &intVerticalLinePosition, int &carCountL, int &carCountR, std::ofstream &myfile) {
+    bool blnAtLeastOneBlobCrossedTheLine = 0;
 
     for (auto blob : blobs) {
 
         if (blob.blnStillBeingTracked == true && blob.centerPositions.size() >= 2) {
             int prevFrameIndex = (int)blob.centerPositions.size() - 2;
             int currFrameIndex = (int)blob.centerPositions.size() - 1;
-
-            if (blob.centerPositions[prevFrameIndex].y > intHorizontalLinePosition && blob.centerPositions[currFrameIndex].y <= intHorizontalLinePosition) {
-                carCount++;
-                blnAtLeastOneBlobCrossedTheLine = true;
+            
+			//going left
+            if (blob.centerPositions[prevFrameIndex].x > intVerticalLinePosition && blob.centerPositions[currFrameIndex].x <= intVerticalLinePosition) {
+                carCountL++;
+                time_t now = time(0);
+				char* dt = strtok(ctime(&now), "\n");;
+                std::cout << dt << ",1,0 (Left)" << std::endl;
+                myfile << dt << ",1,0" << std::endl;
+                blnAtLeastOneBlobCrossedTheLine = 1;
+            }
+            
+            // going right
+            if (blob.centerPositions[prevFrameIndex].x < intVerticalLinePosition && blob.centerPositions[currFrameIndex].x >= intVerticalLinePosition) {
+                carCountR++;
+                time_t now = time(0);
+				char* dt = strtok(ctime(&now), "\n");;
+                std::cout << dt << ",0,1 (Right)" << std::endl;
+                myfile << dt << ",0,1" << std::endl;
+                blnAtLeastOneBlobCrossedTheLine = 2;
             }
         }
 
@@ -344,29 +385,24 @@ void drawBlobInfoOnImage(std::vector<Blob> &blobs, cv::Mat &imgFrame2Copy) {
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
-void drawCarCountOnImage(int &carCount, cv::Mat &imgFrame2Copy) {
+void drawCarCountOnImage(int &carCountL, int &carCountR, cv::Mat &imgFrame2Copy) {
 
     int intFontFace = CV_FONT_HERSHEY_SIMPLEX;
     double dblFontScale = (imgFrame2Copy.rows * imgFrame2Copy.cols) / 300000.0;
     int intFontThickness = (int)std::round(dblFontScale * 1.5);
 
-    cv::Size textSize = cv::getTextSize(std::to_string(carCount), intFontFace, dblFontScale, intFontThickness, 0);
+    cv::Size textSizeL = cv::getTextSize("L: " + std::to_string(carCountL), intFontFace, dblFontScale, intFontThickness, 0);
+    cv::Size textSizeR = cv::getTextSize("R: " + std::to_string(carCountR), intFontFace, dblFontScale, intFontThickness, 0);
 
-    cv::Point ptTextBottomLeftPosition;
+    cv::Point ptTextBottomLeftPositionL, ptTextBottomLeftPositionR;
 
-    ptTextBottomLeftPosition.x = imgFrame2Copy.cols - 1 - (int)((double)textSize.width * 1.25);
-    ptTextBottomLeftPosition.y = (int)((double)textSize.height * 1.25);
+    ptTextBottomLeftPositionL.x = imgFrame2Copy.cols - 1 - (int)((double)textSizeL.width * 1.25);
+    ptTextBottomLeftPositionL.y = (int)((double)textSizeL.height * 1.25);
+    
+    ptTextBottomLeftPositionR.x = ptTextBottomLeftPositionL.x;
+    ptTextBottomLeftPositionR.y = ptTextBottomLeftPositionL.y+(textSizeL.height) * 1.25;
 
-    cv::putText(imgFrame2Copy, std::to_string(carCount), ptTextBottomLeftPosition, intFontFace, dblFontScale, SCALAR_GREEN, intFontThickness);
+    cv::putText(imgFrame2Copy, "L: " + std::to_string(carCountL), ptTextBottomLeftPositionL, intFontFace, dblFontScale, SCALAR_GREEN, intFontThickness);
+    cv::putText(imgFrame2Copy, "R: " + std::to_string(carCountR), ptTextBottomLeftPositionR, intFontFace, dblFontScale, SCALAR_YELLOW, intFontThickness);
 
 }
-
-
-
-
-
-
-
-
-
-
