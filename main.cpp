@@ -1,4 +1,5 @@
 // main.cpp
+// Supply video name on the command line. Filename, no full path, as this will break the log file path! (because I didn't do it properly!) 
 
 #include<opencv2/core/core.hpp>
 #include<opencv2/highgui/highgui.hpp>
@@ -13,6 +14,8 @@
 #include "Blob.h"
 
 #define SHOW_STEPS            // un-comment or comment this line to show steps or not
+
+#define FRAME_SCALE		1	// divide frame dimentions by this number
 
 // global variables ///////////////////////////////////////////////////////////////////////////////
 const cv::Scalar SCALAR_BLACK = cv::Scalar(0.0, 0.0, 0.0);
@@ -34,7 +37,7 @@ void drawBlobInfoOnImage(std::vector<Blob> &blobs, cv::Mat &imgFrame2Copy);
 void drawCarCountOnImage(int &carCountL, int &carCountR, cv::Mat &imgFrame2Copy);
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
-int main(void) {
+int main(int argc, char* argv[]) {
 
     cv::VideoCapture capVideo;
     std::ofstream myfile; // log file
@@ -52,11 +55,13 @@ int main(void) {
     int carCountR = 0;
 
     //capVideo.open("CarsDrivingUnderBridge.mp4");
-    capVideo.open("gP5PupjD2po.mp4");
+    //capVideo.open("gP5PupjD2po.mp4");
+    //capVideo.open("mp4/vid3.mp4");
+    capVideo.open(argv[1]);
     
     // log file
-    myfile.open ("/tmp/OpenCV-" + std::to_string(time(0)) + ".txt");
-    std::cout << "Logging to: \"/tmp/OpenCV-" << std::to_string(time(0)) << ".txt\"" << std::endl;
+    myfile.open ("/tmp/OpenCV-" + std::string(argv[1]) + "-" + std::to_string(time(0)) + ".txt");
+    std::cout << "Logging to: \"/tmp/OpenCV-" << argv[1] << "-" << std::to_string(time(0)) << ".txt\"" << std::endl;
     
     myfile << "\"Timestamp\",\"Left\",\"Right\"" << std::endl;
 
@@ -75,8 +80,8 @@ int main(void) {
     capVideo.read(imgFrame1L);
     capVideo.read(imgFrame2L);
     
-	resize(imgFrame1L, imgFrame1, cv::Size(imgFrame1L.size().width/2, imgFrame1L.size().height/2) );
-	resize(imgFrame2L, imgFrame2, cv::Size(imgFrame2L.size().width/2, imgFrame2L.size().height/2) );
+	resize(imgFrame1L, imgFrame1, cv::Size(imgFrame1L.size().width/FRAME_SCALE, imgFrame1L.size().height/FRAME_SCALE) );
+	resize(imgFrame2L, imgFrame2, cv::Size(imgFrame2L.size().width/FRAME_SCALE, imgFrame2L.size().height/FRAME_SCALE) );
 
 
     //int intHorizontalLinePosition = (int)std::round((double)imgFrame1.rows * 0.35);
@@ -199,7 +204,7 @@ int main(void) {
 
         if ((capVideo.get(CV_CAP_PROP_POS_FRAMES) + 1) < capVideo.get(CV_CAP_PROP_FRAME_COUNT)) {
             capVideo.read(imgFrame2L);
-            resize(imgFrame2L, imgFrame2, cv::Size(imgFrame2L.size().width/2, imgFrame2L.size().height/2) );
+            resize(imgFrame2L, imgFrame2, cv::Size(imgFrame2L.size().width/FRAME_SCALE, imgFrame2L.size().height/FRAME_SCALE) );
         }
         else {
             time_t now = time(0);
