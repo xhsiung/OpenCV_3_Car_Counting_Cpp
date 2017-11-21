@@ -1,3 +1,6 @@
+Test run
+./main Car.mp4
+
 This video shows my changes to the original:
 https://www.youtube.com/watch?v=bkxbW8qrHHc
 
