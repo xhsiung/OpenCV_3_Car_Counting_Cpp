@@ -215,7 +215,7 @@ int main(int argc, char* argv[]) {
 
         blnFirstFrame = false;
         frameCount++;
-        chCheckForEscKey = cv::waitKey(1);
+        chCheckForEscKey = cv::waitKey(70);
     }
 
     if (chCheckForEscKey != 27) {               // if the user did not press esc (i.e. we reached the end of the video)
